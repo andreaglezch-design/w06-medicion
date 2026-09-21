@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prueba de Persistencia Insegura</title>
+<meta name="description" content="Reconoce cuándo el protocolo ensayado ya no es seguro. Contradicción controlada, decisión medida, transferencia validada.">
+<style>
+  :root {
+    --ink: #1a1a1a; --charcoal: #333; --muted: #7a776d;
+    --paper: #faf8f3; --card: #fff; --line: #e4e0d4;
+    --gold: #b8860b; --gold-dark: #8b6914;
+    --sage: #4f6b52; --sage-bg: #e9efe5;
+    --warning: #c97a2c; --warning-bg: #fbf1dd;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    background: var(--paper); color: var(--charcoal); line-height: 1.55;
+  }
+  .wrap { max-width: 600px; margin: 0 auto; padding: 0 20px 80px; }
+  header { padding: 36px 0 8px; }
+  .eyebrow { font-size: 12px; color: var(--gold); font-weight: 700; margin: 0 0 6px; text-transform: uppercase; letter-spacing: 0.03em; }
+  h1 { font-size: 28px; color: var(--ink); margin: 0 0 10px; line-height: 1.2; }
+  .lede { font-size: 15px; color: var(--muted); margin: 0 0 28px; max-width: 50ch; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 22px 24px; margin-bottom: 16px; }
+  .card h2 { font-size: 16px; margin: 0 0 4px; color: var(--ink); }
+  .card p { font-size: 14px; color: var(--charcoal); margin: 0 0 12px; }
+  .card p.hint { font-size: 13px; color: var(--muted); margin: 0; }
+  nav.tabs { display: flex; gap: 6px; margin-bottom: 26px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  nav.tabs button {
+    background: none; border: none; padding: 10px 4px; margin-right: 18px; font-size: 14.5px;
+    color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; font-family: inherit;
+  }
+  nav.tabs button.active { color: var(--ink); border-bottom-color: var(--gold); font-weight: 600; }
+  #home-view.active, #scenario-view.active, #results-view.active { display: block; }
+  #home-view, #scenario-view, #results-view { display: none; }
+  
+  /* 3D isometric room */
+  .room-3d { perspective: 1000px; margin: 20px 0; }
+  .room { width: 100%; max-width: 400px; height: 300px; position: relative; margin: 0 auto;
+    transform-style: preserve-3d; animation: enterRoom 0.6s ease-out; }
+  @keyframes enterRoom { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+  
+  .room-wall { position: absolute; background: #e8e4d8; border: 1px solid #c9c0b0; }
+  .wall-back { width: 100%; height: 150px; top: 0; left: 0; background: linear-gradient(135deg, #e8e4d8 0%, #d9cfc0 100%); }
+  .wall-left { width: 40%; height: 150px; top: 0; left: 0; background: #d4cac0; clip-path: polygon(0 0, 100% 0, 0 100%); opacity: 0.8; }
+  .wall-right { width: 40%; height: 150px; top: 0; right: 0; background: #dfd5ca; clip-path: polygon(100% 0, 0 0, 100% 100%); opacity: 0.8; }
+  .floor { position: absolute; bottom: 0; width: 100%; height: 150px; background: linear-gradient(to bottom, #cfc8bb, #c0b8aa); border-top: 1px solid #b8b0a0; }
+  
+  .crowd { position: absolute; bottom: 60px; left: 50%; transform: translateX(-50%); width: 80px; height: 60px; }
+  .person { position: absolute; width: 12px; height: 20px; background: #6b6964; border-radius: 2px; }
+  .person:nth-child(1) { left: 0; bottom: 0; }
+  .person:nth-child(2) { left: 20px; bottom: 5px; }
+  .person:nth-child(3) { left: 40px; bottom: 0; }
+  .person:nth-child(4) { left: 60px; bottom: 5px; }
+  .person:nth-child(5) { left: 70px; bottom: 0; }
+  
+  .door { position: absolute; bottom: 80px; right: 30px; width: 40px; height: 60px; background: #9b8b7e; border: 2px solid #6b5a4a; }
+  .door-blocked { opacity: 0.5; background: #8b7b6e !important; }
+  .door-blocked::after { content: '✕'; position: absolute; color: #c97a2c; font-size: 32px; top: 50%; left: 50%; transform: translate(-50%, -50%); font-weight: bold; }
+  
+  .shaking { animation: shake 0.4s ease-in-out infinite; }
+  @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+  
+  .choice-area { margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  .choice-btn { flex: 1; min-width: 80px; padding: 12px 8px; border: 2px solid var(--line); background: #fff; border-radius: 8px;
+    font-size: 13px; cursor: pointer; font-family: inherit; color: var(--charcoal); font-weight: 500; transition: all 0.2s; }
+  .choice-btn:hover { border-color: var(--gold); background: #fffbf3; }
+  .choice-btn.selected { border-color: var(--gold); background: var(--warning-bg); }
+  
+  .badge-sim { display: inline-block; background: #eee; color: #666; font-size: 10px; font-weight: 700;
+    letter-spacing: 0.03em; padding: 4px 10px; border-radius: 5px; margin-bottom: 10px; text-transform: uppercase; }
+  
+  .result { border-radius: 12px; padding: 16px 18px; margin-top: 16px; font-size: 14px; }
+  .result.correct { background: var(--sage-bg); color: #2f4a32; }
+  .result.incorrect { background: var(--warning-bg); color: #7a5510; }
+  .result.transfer-success { background: #e8f5e9; color: #1b5e20; }
+  .result.transfer-fail { background: #fff3e0; color: #e65100; }
+  
+  .scenario-label { font-size: 12px; color: var(--muted); margin-bottom: 8px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
+  .primary-btn { width: 100%; margin-top: 12px; background: var(--gold); color: #fff; border: none;
+    padding: 13px; border-radius: 9px; font-size: 15px; font-weight: 600; cursor: pointer; font-family: inherit; }
+  .primary-btn:hover { background: var(--gold-dark); }
+  .secondary-btn { width: 100%; margin-top: 10px; background: transparent; color: var(--ink); border: 1px solid var(--line);
+    padding: 12px; border-radius: 9px; font-size: 14px; cursor: pointer; font-family: inherit; }
+  
+  footer { margin-top: 40px; font-size: 11px; color: var(--muted); text-align: center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <p class="eyebrow">Prueba de Persistencia Insegura</p>
+    <h1>¿Cuándo interrumpes el protocolo?</h1>
+    <p class="lede">Dos escenarios con contradicciones controladas. La pregunta: ¿reconoces cuándo la ruta ensayada ya no es segura?</p>
+  </header>
+
+  <nav class="tabs">
+    <button class="active" data-tab="home">Inicio</button>
+    <button data-tab="scenario">Escenario</button>
+    <button data-tab="results">Resultados</button>
+  </nav>
+
+  <div id="home-view" class="active">
+    <div class="card">
+      <h2>¿Por qué esta prueba?</h2>
+      <p class="hint">Un simulacro de terremoto normal prueba si ejecutas la ruta ensayada. Esta prueba pregunta algo más difícil: ¿reconoces cuándo esa ruta ya no es segura y la interrumpes?</p>
+    </div>
+    <div class="card">
+      <h2>Cómo funciona</h2>
+      <p class="hint" style="margin-bottom: 0;">Dos escenarios. En cada uno: ves una sala, esperas una contradicción (la multitud se detiene, o la salida se bloquea), y decides: ¿sigues la ruta o la interrumpes? La app mide qué tan rápido decidiste, si tu decisión fue correcta según el PIPC de tu escuela, y si lo que aprendiste en el Escenario 1 se transfiere al Escenario 2 (que tiene otra superficie pero el mismo conflicto subyacente).</p>
+    </div>
+    <button class="primary-btn" onclick="startScenario()">Comenzar Escenario 1</button>
+  </div>
+
+  <div id="scenario-view">
+    <div class="scenario-label" id="scenario-label">Escenario 1 de 2</div>
+    <div class="card">
+      <span class="badge-sim">Decisión simulada — no es comportamiento real</span>
+      <div class="room-3d">
+        <div class="room" id="room">
+          <div class="room-wall wall-back"></div>
+          <div class="room-wall wall-left"></div>
+          <div class="room-wall wall-right"></div>
+          <div class="crowd" id="crowd">
+            <div class="person"></div>
+            <div class="person"></div>
+            <div class="person"></div>
+            <div class="person"></div>
+            <div class="person"></div>
+          </div>
+          <div class="door" id="door"></div>
+          <div class="floor"></div>
+        </div>
+      </div>
+      <div id="countdown" style="text-align: center; font-size: 13px; color: var(--muted); margin-top: 10px;"></div>
+      <div class="choice-area" id="choiceArea"></div>
+    </div>
+  </div>
+
+  <div id="results-view">
+    <div class="card">
+      <h2>Tu decisión</h2>
+      <div id="resultContent"></div>
+    </div>
+  </div>
+
+  <footer>Prueba de Persistencia Insegura · Semana 6 · The Crystal Ball Studio · Datos de ejemplo · Ninguna decisión simulada es predicción de comportamiento real · Todos los resultados están etiquetados como simulados</footer>
+</div>
+
+<script>
+const tabs = document.querySelectorAll('nav.tabs button');
+const views = { home: document.getElementById('home-view'), scenario: document.getElementById('scenario-view'), results: document.getElementById('results-view') };
+tabs.forEach(btn => {
+  btn.addEventListener('click', () => {
+    tabs.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    Object.values(views).forEach(v => v.classList.remove('active'));
+    views[btn.dataset.tab].classList.add('active');
+  });
+});
+
+// Load state from localStorage
+let state = { scenario: 1, scenario1_choice: null, scenario1_time: null, scenario1_correct: null, contradiction: null };
+try { const saved = localStorage.getItem('w06_state'); if (saved) state = { ...state, ...JSON.parse(saved) }; } catch (e) {}
+
+function saveState() { localStorage.setItem('w06_state', JSON.stringify(state)); }
+
+function startScenario() {
+  if (state.scenario === 1) {
+    state.contradiction = Math.random() > 0.5 ? 'crowd' : 'door'; // crowd stops vs. door blocked
+  } else {
+    state.contradiction = state.contradiction === 'crowd' ? 'door' : 'crowd'; // opposite in Scenario 2
+  }
+  saveState();
+  
+  document.getElementById('scenario-label').textContent = `Escenario ${state.scenario} de 2`;
+  
+  // Reset room
+  const room = document.getElementById('room');
+  room.classList.remove('shaking');
+  const door = document.getElementById('door');
+  door.classList.remove('door-blocked');
+  const crowd = document.getElementById('crowd');
+  if (crowd.style.opacity === '0.3') crowd.style.opacity = '1';
+  
+  // Wait then trigger contradiction
+  setTimeout(() => {
+    room.classList.add('shaking');
+    if (state.contradiction === 'crowd') {
+      crowd.style.opacity = '0.3';
+      crowd.style.textDecoration = 'line-through';
+    } else {
+      door.classList.add('door-blocked');
+    }
+    startTimer();
+  }, 1500);
+}
+
+function startTimer() {
+  state.startTime = Date.now();
+  const choiceArea = document.getElementById('choiceArea');
+  choiceArea.innerHTML = `
+    <button class="choice-btn" onclick="recordChoice('persist')">Seguir ruta</button>
+    <button class="choice-btn" onclick="recordChoice('interrupt')">Interrumpir</button>
+  `;
+}
+
+function recordChoice(choice) {
+  state.endTime = Date.now();
+  const timeElapsed = (state.endTime - state.startTime) / 1000;
+  
+  // Determine correctness based on PIPC rule: when contradiction exists, interrupting is correct
+  const isCorrect = choice === 'interrupt';
+  
+  if (state.scenario === 1) {
+    state.scenario1_choice = choice;
+    state.scenario1_time = timeElapsed;
+    state.scenario1_correct = isCorrect;
+    saveState();
+    showResult(choice, timeElapsed, isCorrect, 1);
+  } else {
+    const scenario2_correct = isCorrect;
+    saveState();
+    showResult(choice, timeElapsed, isCorrect, 2, state.scenario1_correct, scenario2_correct);
+  }
+}
+
+function showResult(choice, time, isCorrect, scenarioNum, scenario1Correct, scenario2Correct) {
+  const room = document.getElementById('room');
+  room.classList.remove('shaking');
+  
+  const choiceArea = document.getElementById('choiceArea');
+  choiceArea.innerHTML = '';
+  
+  const resultContent = document.getElementById('resultContent');
+  let html = `<p class="hint" style="margin-bottom: 12px;"><strong>Escenario ${scenarioNum}:</strong> Decisión simulada</p>`;
+  html += `<p><strong>Elección:</strong> ${choice === 'persist' ? 'Seguir ruta ensayada' : 'Interrumpir y elegir otra acción'}</p>`;
+  html += `<p><strong>Tiempo:</strong> ${time.toFixed(1)} segundos desde la contradicción</p>`;
+  html += `<p><strong>Según PIPC:</strong> ${isCorrect ? 'Correcto — reconociste la contradicción' : 'Revisa el PIPC — la contradicción indicaba interrumpir'}</p>`;
+  
+  if (scenarioNum === 1) {
+    html += `<div class="result ${isCorrect ? 'correct' : 'incorrect'}">Escenario 1 completo. <strong>Preparándose Escenario 2</strong> con otra contradicción en otra parte del edificio, pero el mismo conflicto subyacente.</div>`;
+    html += `<button class="primary-btn" onclick="startScenario()">Ir al Escenario 2</button>`;
+    resultContent.innerHTML = html;
+    tabs[2].click(); // Switch to results view
+  } else {
+    // Transfer test
+    const transferred = scenario1Correct === scenario2Correct && scenario2Correct === true;
+    const s1Label = scenario1Correct ? 'correcto' : 'incorrecto';
+    const s2Label = scenario2Correct ? 'correcto' : 'incorrecto';
+    
+    html += `<p style="margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line);"><strong>Transfer Test:</strong></p>`;
+    html += `<p>Escenario 1: ${s1Label} | Escenario 2: ${s2Label}</p>`;
+    
+    if (transferred) {
+      html += `<div class="result transfer-success"><strong>✓ Transfer Success:</strong> Reconociste la contradicción en un escenario nuevo. Ese es el comportamiento que los equipos de protección civil necesitan.</div>`;
+    } else if (scenario1Correct && !scenario2Correct) {
+      html += `<div class="result transfer-fail"><strong>Memorización sólo:</strong> Acertaste el Escenario 1 pero no el 2. El aprendizaje no se transfirió a una contradicción con otra superficie.</div>`;
+    } else {
+      html += `<div class="result incorrect">Revisa ambos escenarios para entender dónde la ruta ensayada puede dejar de ser segura.</div>`;
+    }
+    
+    html += `<p style="font-size: 12px; color: var(--muted); margin-top: 16px;"><strong>Recuerda:</strong> esta es una decisión simulada. El resultado no predice tu comportamiento real en un terremoto. Lo que mide es si reconoces, en un momento controlado, cuándo una ruta ensayada debe interrumpirse.</p>`;
+    html += `<button class="secondary-btn" onclick="location.reload()">Reiniciar</button>`;
+    resultContent.innerHTML = html;
+    tabs[2].click(); // Switch to results view
+  }
+}
+</script>
+</body>
+</html>
